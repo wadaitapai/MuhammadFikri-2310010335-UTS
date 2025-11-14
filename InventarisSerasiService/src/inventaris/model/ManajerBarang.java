@@ -3,22 +3,26 @@ package inventaris.model;
 import java.util.ArrayList;
 
 public class ManajerBarang {
-    private ArrayList<Barang> listBarang = new ArrayList<>();
+
+    private ArrayList<Barang> daftar = new ArrayList<>();
 
     public void tambah(Barang b) {
-        listBarang.add(b);
-    }
-
-    public void hapus(int index) {
-        listBarang.remove(index);
+        daftar.add(b);
     }
 
     public void update(int index, Barang b) {
-        listBarang.set(index, b);
+        if (index >= 0 && index < daftar.size()) {
+            daftar.set(index, b);
+        }
+    }
+
+    public void hapus(int index) {
+        if (index >= 0 && index < daftar.size()) {
+            daftar.remove(index);
+        }
     }
 
     public ArrayList<Barang> getAll() {
-        return listBarang;
+        return daftar;
     }
 }
-

@@ -3,11 +3,12 @@ package inventaris.view;
 import inventaris.model.*;
 import java.io.*;
 import java.text.SimpleDateFormat;
+import java.util.Date; // PERBAIKAN: Import Date untuk mengambil data saat update
 import javax.swing.*;
 import javax.swing.event.*;
 
 public class InventarisFrame extends javax.swing.JFrame {
-  // ================================
+    // ================================
     // Data & Model
     // ================================
     ManajerBarang manager = new ManajerBarang();    // Penyimpanan data barang
@@ -27,13 +28,38 @@ public class InventarisFrame extends javax.swing.JFrame {
         // ================================
         listBarang.addListSelectionListener(new ListSelectionListener() {
             public void valueChanged(ListSelectionEvent evt) {
-                tampilkanDetail();
+                if (!evt.getValueIsAdjusting()) { // Menghindari dua kali event
+                    tampilkanDetail();
+                    tampilkanDataKeForm(); // PERBAIKAN: Panggil fungsi untuk mengisi form
+                }
             }
         });
         
-         btnImport.addActionListener(e -> popupImport());
-         btnExport.addActionListener(e -> popupExport());
+        btnImport.addActionListener(e -> popupImport());
+        btnExport.addActionListener(e -> popupExport());
     }
+    
+    // PERBAIKAN: Fungsi untuk mengisi form ketika item list diklik
+    private void tampilkanDataKeForm() {
+        int index = listBarang.getSelectedIndex();
+        if (index >= 0) {
+            Barang b = manager.getAll().get(index);
+            txtKode.setText(b.getKode());
+            txtNama.setText(b.getNama());
+            txtJumlah.setText(String.valueOf(b.getJumlah()));
+            txtHarga.setText(String.valueOf(b.getHarga()));
+            
+            // Mengubah String Tanggal menjadi Date untuk JDateChooser
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat("dd MMMM yyyy");
+                Date tanggalMasuk = sdf.parse(b.getTanggal());
+                dateTanggal.setDate(tanggalMasuk);
+            } catch (Exception ex) {
+                dateTanggal.setDate(null);
+            }
+        }
+    }
+    
     // ================================
     // Menampilkan detail barang
     // ================================
@@ -42,14 +68,15 @@ public class InventarisFrame extends javax.swing.JFrame {
         if (index >= 0) {
             Barang b = manager.getAll().get(index);
             txtDetail.setText(
-                "Kode   : " + b.getKode() +
-                "\nNama   : " + b.getNama() +
+                "Kode    : " + b.getKode() +
+                "\nNama    : " + b.getNama() +
                 "\nJumlah : " + b.getJumlah() +
                 "\nHarga  : " + b.getHarga()+
                 "\nTanggal Masuk : " + b.getTanggal()
             );
         }
     }
+    
    // =====================================================
     // CRUD
     // =====================================================
@@ -70,7 +97,7 @@ public class InventarisFrame extends javax.swing.JFrame {
 
             JOptionPane.showMessageDialog(this, "Barang berhasil ditambahkan!");
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Input tidak valid!");
+            JOptionPane.showMessageDialog(this, "Input tidak valid! Pastikan semua kolom terisi dengan benar.");
         }
     }
 
@@ -88,9 +115,15 @@ public class InventarisFrame extends javax.swing.JFrame {
             double harga = Double.parseDouble(txtHarga.getText());
             SimpleDateFormat sdf = new SimpleDateFormat("dd MMMM yyyy");
             String tanggal = sdf.format(dateTanggal.getDate());
-                    
+            
+            // PERBAIKAN: Buat objek Barang baru dan update manajer
+            Barang barangBaru = new Barang(kode, nama, jumlah, harga, tanggal);
+            manager.update(index, barangBaru);
+            
             refreshList();
-                  
+            listBarang.setSelectedIndex(index); // Pilih kembali item yang diupdate
+            tampilkanDetail(); // Tampilkan detail yang baru
+
             JOptionPane.showMessageDialog(this, "Barang berhasil diupdate!");
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Input tidak valid!");
@@ -127,11 +160,14 @@ public class InventarisFrame extends javax.swing.JFrame {
         try {
             FileWriter fw = new FileWriter("data_barang.txt");
             for (Barang b : manager.getAll()) {
-                fw.write(b.getKode() + ";" + b.getNama() + ";" + b.getJumlah() + ";" + b.getHarga() + "\n");
+                // PERBAIKAN: Menyertakan Tanggal agar konsisten saat import
+                fw.write(b.getKode() + ";" + b.getNama() + ";" + b.getJumlah() + ";" + b.getHarga() + ";" + b.getTanggal() + "\n");
             }
             fw.close();
             JOptionPane.showMessageDialog(this, "Export TXT berhasil!");
-        } catch (Exception e) {}
+        } catch (Exception e) {
+             JOptionPane.showMessageDialog(this, "Gagal Export TXT!");
+        }
     }
 
     private void exportJSON() {
@@ -144,13 +180,16 @@ public class InventarisFrame extends javax.swing.JFrame {
                 fw.write("    \"kode\": \"" + b.getKode() + "\",\n");
                 fw.write("    \"nama\": \"" + b.getNama() + "\",\n");
                 fw.write("    \"jumlah\": " + b.getJumlah() + ",\n");
-                fw.write("    \"harga\": " + b.getHarga() + "\n");
+                fw.write("    \"harga\": " + b.getHarga() + ",\n");
+                fw.write("    \"tanggal\": \"" + b.getTanggal() + "\"\n"); // Tambahkan tanggal
                 fw.write(i == manager.getAll().size() - 1 ? "  }\n" : "  },\n");
             }
             fw.write("]");
             fw.close();
             JOptionPane.showMessageDialog(this, "Export JSON berhasil!");
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Gagal Export JSON!");
+        }
     }
     // ===================================
     // EXPORT EXCEL (Tab Separated)
@@ -166,8 +205,10 @@ public class InventarisFrame extends javax.swing.JFrame {
                         b.getTanggal() + "\n");
             }
             fw.close();
-            JOptionPane.showMessageDialog(this, "Excel berhasil!");
-        } catch (Exception e) {}
+            JOptionPane.showMessageDialog(this, "Export Excel berhasil!");
+        } catch (Exception e) {
+             JOptionPane.showMessageDialog(this, "Gagal Export Excel!");
+        }
     }
     // ===================================
     // EXPORT PDF (Sederhana)
@@ -189,8 +230,10 @@ public class InventarisFrame extends javax.swing.JFrame {
             fos.write(content.getBytes());
             fos.close();
 
-            JOptionPane.showMessageDialog(this, "PDF berhasil!");
-        } catch (Exception e) {}
+            JOptionPane.showMessageDialog(this, "Export PDF berhasil!");
+        } catch (Exception e) {
+             JOptionPane.showMessageDialog(this, "Gagal Export PDF!");
+        }
     }
 
     // =====================================================
@@ -205,25 +248,28 @@ public class InventarisFrame extends javax.swing.JFrame {
             manager.getAll().clear();
             modelList.clear();
 
+            // PERBAIKAN: Sekarang membaca 5 elemen, termasuk tanggal (d[4])
             while ((line = br.readLine()) != null) {
                 String[] d = line.split(";");
-
-                 Barang b = new Barang(
-                        d[0], d[1],
-                        Integer.parseInt(d[2]),
-                        Double.parseDouble(d[3]),
-                        d[4]
-                );
-
-                manager.tambah(b);
-               }
+                
+                // Pastikan format data minimal 5 elemen
+                if (d.length >= 5) {
+                    Barang b = new Barang(
+                            d[0], d[1],
+                            Integer.parseInt(d[2]),
+                            Double.parseDouble(d[3]),
+                            d[4]
+                    );
+                    manager.tambah(b);
+                }
+            }
             br.close();
             refreshList();
 
             JOptionPane.showMessageDialog(this, "Import TXT OK!");
 
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Gagal import TXT");
+            JOptionPane.showMessageDialog(this, "Gagal import TXT. Pastikan file data_barang.txt ada dan formatnya benar.");
         }
     }
     // ===================================
@@ -247,17 +293,22 @@ public class InventarisFrame extends javax.swing.JFrame {
                 item = item.replace("{", "").replace("}", "").trim();
                 String[] x = item.split(",");
 
+                // Parsing nilai dari JSON (index bisa berbeda tergantung format export)
                 String kode = x[0].split(":")[1].replace("\"", "").trim();
                 String nama = x[1].split(":")[1].replace("\"", "").trim();
                 int jumlah = Integer.parseInt(x[2].split(":")[1].trim());
                 double harga = Double.parseDouble(x[3].split(":")[1].trim());
+                String tanggal = x[4].split(":")[1].replace("\"", "").trim(); // Tambahkan parsing tanggal
 
+                // PERBAIKAN: Membuat dan menambahkan objek Barang ke Manajer
+                Barang b = new Barang(kode, nama, jumlah, harga, tanggal);
+                manager.tambah(b);
             }
-                refreshList();
+            refreshList();
 
             JOptionPane.showMessageDialog(this, "Import JSON berhasil!");
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Error import JSON!");
+            JOptionPane.showMessageDialog(this, "Error import JSON! Pastikan file data_barang.json ada dan formatnya benar.");
         }
     }
 
@@ -303,7 +354,6 @@ public class InventarisFrame extends javax.swing.JFrame {
 
         jLabel1 = new javax.swing.JLabel();
         jPanel1 = new javax.swing.JPanel();
-        jPanel5 = new javax.swing.JPanel();
         lblKode = new javax.swing.JLabel();
         lblNama = new javax.swing.JLabel();
         lblJumlah = new javax.swing.JLabel();
@@ -334,17 +384,9 @@ public class InventarisFrame extends javax.swing.JFrame {
 
         jLabel1.setFont(new java.awt.Font("Tahoma", 1, 30)); // NOI18N
         jLabel1.setText("APLIKASI INVENTARIS BARANG TOKO \"SERASI\" SERVICE");
-        jLabel1.setMaximumSize(new java.awt.Dimension(879, 37));
         getContentPane().add(jLabel1, java.awt.BorderLayout.CENTER);
 
-        jPanel1.setBackground(new java.awt.Color(204, 204, 204));
         jPanel1.setBorder(new javax.swing.border.SoftBevelBorder(javax.swing.border.BevelBorder.RAISED));
-
-        jPanel5.setBackground(new java.awt.Color(153, 153, 255));
-        jPanel5.setBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.RAISED));
-        jPanel5.setMaximumSize(new java.awt.Dimension(2147483647, 2147483647));
-        jPanel5.setMinimumSize(new java.awt.Dimension(4, 4));
-        jPanel5.setLayout(new java.awt.BorderLayout());
 
         lblKode.setFont(new java.awt.Font("Verdana", 0, 18)); // NOI18N
         lblKode.setText("Kode Barang    : ");
@@ -392,6 +434,7 @@ public class InventarisFrame extends javax.swing.JFrame {
             }
         });
 
+        lblJudul.setBackground(new java.awt.Color(255, 255, 51));
         lblJudul.setFont(new java.awt.Font("Tahoma", 1, 28)); // NOI18N
         lblJudul.setText("APLIKASI INVENTARIS BARANG TOKO \"SERASI\"SERVICE");
 
@@ -430,8 +473,7 @@ public class InventarisFrame extends javax.swing.JFrame {
             .addGroup(jPanel1Layout.createSequentialGroup()
                 .addGap(160, 160, 160)
                 .addComponent(lblJudul)
-                .addGap(146, 146, 146)
-                .addComponent(jPanel5, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGap(0, 371, Short.MAX_VALUE))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -439,10 +481,8 @@ public class InventarisFrame extends javax.swing.JFrame {
                 .addContainerGap()
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                     .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                            .addComponent(jPanel5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(lblJudul))
-                        .addGap(18, 18, 18)
+                        .addComponent(lblJudul)
+                        .addGap(24, 24, 24)
                         .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(lblKode)
                             .addComponent(txtKode, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
@@ -487,9 +527,10 @@ public class InventarisFrame extends javax.swing.JFrame {
 
         jPanel6.add(jScrollPane1, java.awt.BorderLayout.CENTER);
 
-        jPanel2.setBackground(new java.awt.Color(153, 153, 255));
+        jPanel2.setBackground(new java.awt.Color(0, 0, 0));
 
         jLabel6.setFont(new java.awt.Font("Tahoma", 0, 18)); // NOI18N
+        jLabel6.setForeground(new java.awt.Color(255, 255, 51));
         jLabel6.setText("Daftar Barang");
 
         javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
@@ -516,7 +557,7 @@ public class InventarisFrame extends javax.swing.JFrame {
         jPanel3.setLayout(new java.awt.BorderLayout());
         getContentPane().add(jPanel3, java.awt.BorderLayout.PAGE_END);
 
-        jPanel4.setBackground(new java.awt.Color(204, 204, 204));
+        jPanel4.setBackground(new java.awt.Color(0, 0, 0));
 
         txtDetail.setEditable(false);
         txtDetail.setColumns(20);
@@ -628,7 +669,6 @@ public class InventarisFrame extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
     private javax.swing.JPanel jPanel4;
-    private javax.swing.JPanel jPanel5;
     private javax.swing.JPanel jPanel6;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
